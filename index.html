@@ -684,9 +684,9 @@ async function callC(prompt){
   if(d.error)throw new Error(d.error.message||JSON.stringify(d.error));
   return d.content?.[0]?.text||'';}
 
-async function streamC(prompt,cb){
+async function streamC(prompt, cb, max_tokens=16000){
   const r=await fetch(`${API}/api/claude`,{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({apiKey:CK,prompt,stream:true})});
+    body:JSON.stringify({apiKey:CK,prompt,stream:true,max_tokens})});
   const reader=r.body.getReader();const dec=new TextDecoder();
   let buf='';let full='';
   while(true){const{done,value}=await reader.read();if(done)break;
@@ -702,20 +702,8 @@ async function callP(query){
   if(d.error)throw new Error(JSON.stringify(d.error));
   return d;}
 
-async function genImg(prompt, size='1024x1024', style='cinematic'){
-  const isHiggsStyle=['cinematic','dramatic','film'].includes(style);
-
-  // 1순위: Higgsfield — 시네마틱 스타일일 때만!
-  if(HID&&HPW&&isHiggsStyle){
-    try{
-      const r=await fetch(`${API}/api/higgsfield`,{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({apiId:HID,apiPass:HPW,prompt,style})});
-      const d=await r.json();
-      if(d.url)return d.url;
-      console.log('Higgsfield 실패, 다음으로:',d.error);
-    }catch(e){console.log('Higgsfield 오류:',e.message);}
-  }
-  // 2순위: Gemini (한글 텍스트 최적화 + 인포그래픽 등 일반 스타일)
+async function genImg(prompt, size='1024x1024', style='auto'){
+  // Gemini만 사용 (깔끔하고 주제에 맞는 이미지)
   if(GK){
     try{
       const r=await fetch(`${API}/api/gemini`,{method:'POST',headers:{'Content-Type':'application/json'},
@@ -730,7 +718,7 @@ async function genImg(prompt, size='1024x1024', style='cinematic'){
       }
     }catch(e){console.log('Gemini 오류:',e.message);}
   }
-  // 3순위: DALL-E 폴백
+  // 폴백: DALL-E
   if(OK){
     const r=await fetch(`${API}/api/openai`,{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({apiKey:OK,prompt,size})});
@@ -738,7 +726,7 @@ async function genImg(prompt, size='1024x1024', style='cinematic'){
     if(d.error)throw new Error(d.error.message||JSON.stringify(d.error));
     return d.data?.[0]?.url||null;
   }
-  throw new Error('이미지 생성 API Key가 없어요');
+  throw new Error('이미지 API Key 없음');
 }
 
 // 트렌드 주제 추천
@@ -1033,10 +1021,18 @@ ${factCheck?`\n검증된 핵심 팩트:\n${factCheck}`:''}
 
 순수 HTML 태그만. \`\`\`html 마크다운 블록 없이.`;
 
+    // 글 길이별 max_tokens 설정
+    const tokenMap={
+      '보통 (~1500자)':3000,
+      '심층 (~3000자)':6000,
+      '완전 심층 (~5000자)':10000,
+      '전문가급 (~8000자)':16000,
+      '매거진급 (~12000자)':24000
+    };
+    const maxTok=tokenMap[len]||16000;
+
     generatedBody=await streamC(blogPrompt,(t)=>{
-      // 스트리밍 중에는 텍스트로 표시, 완료 후 HTML 렌더링
-      rb.textContent=t;});
-    // 완료 후 HTML로 렌더링
+      rb.textContent=t;},maxTok);
     rb.classList.remove('streaming');
     rb.innerHTML=generatedBody;
 
@@ -1077,11 +1073,15 @@ ${usingHiggs?'Higgsfield 최적화: cinematic lighting, dramatic composition, fi
       document.getElementById('imgCard').style.display='block';
       document.getElementById('imgCntRes').textContent=`총 ${imgCnt}장`;
 
-      const ip=await callC(`블로그: "${generatedTitle}", 주제: "${topic}"
-본문 내용과 직접 연관된 이미지 ${imgCnt}개 프롬프트 (영어, 줄바꿈 구분, 번호 없음).
-${usingHiggs?'Higgsfield 최적화: cinematic lighting, dramatic composition, film-grade quality for each image':''}
-스타일: ${imgStyle.includes('Higgsfield')?'cinematic film style':imgStyle==='AI 자동 선택'?'주제에 가장 어울리는 스타일':imgStyle}
-각 이미지가 블로그의 서로 다른 핵심 포인트를 시각화. 텍스트 없이 순수 비주얼. 각 60단어 이내.`);
+      const ip=await callC(`블로그 제목: "${generatedTitle}", 주제: "${topic}", 키워드: "${kw}"
+위 블로그 본문 내용과 직접 관련된 이미지 ${imgCnt}개의 Gemini 이미지 생성 프롬프트를 영어로 작성해줘.
+줄바꿈으로 구분. 번호 없이.
+규칙:
+- 각 이미지가 블로그 본문의 각기 다른 핵심 내용을 시각화
+- 반드시 주제와 직접 관련된 구체적인 장면
+- 텍스트나 글자 포함 금지
+- 스타일: ${imgStyle==='AI 자동 선택'?'clean, minimal, professional infographic style':imgStyle}
+- 각 40단어 이내로 간결하게`);
 
       const ps=ip.split('\n').filter(p=>p.trim().length>15).slice(0,imgCnt);
       const grid=document.getElementById('imgGrid');grid.innerHTML='';
@@ -1103,9 +1103,7 @@ ${usingHiggs?'Higgsfield 최적화: cinematic lighting, dramatic composition, fi
 
     setS(7);setM('✓ 완성! 리서치 + 타이틀 + 본문 + 이미지 모두 준비됐어요 🎉');
     document.getElementById('dlPackageBtn').style.display='block';
-    if(WPURL&&WPUSER&&WPPASS){
-      document.getElementById('wpUploadBtn').style.display='block';
-    }
+    document.getElementById('wpUploadBtn').style.display='block';
 
   }catch(e){showErr('생성 오류: '+e.message);setM('오류 발생');}
   document.getElementById('runBtn').disabled=false;}
