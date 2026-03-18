@@ -678,8 +678,10 @@ async function callP(query){
   return d;}
 
 async function genImg(prompt, size='1024x1024', style='cinematic'){
-  // 1순위: Higgsfield (오빠 강점 — 시네마틱 고퀄)
-  if(HID&&HPW){
+  const isHiggsStyle=['cinematic','dramatic','film'].includes(style);
+
+  // 1순위: Higgsfield — 시네마틱 스타일일 때만!
+  if(HID&&HPW&&isHiggsStyle){
     try{
       const r=await fetch(`${API}/api/higgsfield`,{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({apiId:HID,apiPass:HPW,prompt,style})});
@@ -688,7 +690,7 @@ async function genImg(prompt, size='1024x1024', style='cinematic'){
       console.log('Higgsfield 실패, 다음으로:',d.error);
     }catch(e){console.log('Higgsfield 오류:',e.message);}
   }
-  // 2순위: Gemini (한글 텍스트 최적화)
+  // 2순위: Gemini (한글 텍스트 최적화 + 인포그래픽 등 일반 스타일)
   if(GK){
     try{
       const r=await fetch(`${API}/api/gemini`,{method:'POST',headers:{'Content-Type':'application/json'},
