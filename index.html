@@ -260,6 +260,10 @@ nav{position:sticky;top:0;z-index:100;background:rgba(8,8,14,0.9);backdrop-filte
     <input type="password" id="ok" placeholder="sk-proj-..." />
     <label>Perplexity API Key (웹 리서치 + 출처 검증)</label>
     <input type="password" id="pk" placeholder="pplx-..." />
+    <label>📊 네이버 DataLab Client ID (실검색량 수치화) ⭐ 무료!</label>
+    <input type="text" id="dlid" placeholder="네이버 Client ID..." />
+    <label>📊 네이버 DataLab Client Secret</label>
+    <input type="password" id="dlsec" placeholder="네이버 Client Secret..." />
     <div class="mbtns">
       <button class="bg" onclick="closeModal()">취소</button>
       <button class="bp" onclick="saveKeys()">저장 ✓</button>
@@ -500,6 +504,8 @@ let PK=localStorage.getItem('bai_p')||'';
 let GK=localStorage.getItem('bai_g')||'';
 let HID=localStorage.getItem('bai_hid')||'';
 let HPW=localStorage.getItem('bai_hpw')||'';
+let DLID=localStorage.getItem('bai_dlid')||'';
+let DLSEC=localStorage.getItem('bai_dlsec')||'';
 let selKw='';let allImgs=[];let sugCnt=3;
 let researchData='';let sourcesData=[];let generatedTitle='';let generatedBody='';
 
@@ -536,6 +542,8 @@ function openModal(){
   document.getElementById('gk').value=GK;
   document.getElementById('ok').value=OK;
   document.getElementById('pk').value=PK;
+  document.getElementById('dlid').value=DLID;
+  document.getElementById('dlsec').value=DLSEC;
   document.getElementById('modal').classList.add('show');}
 function closeModal(){document.getElementById('modal').classList.remove('show');}
 function saveKeys(){
@@ -545,12 +553,16 @@ function saveKeys(){
   const g=document.getElementById('gk').value.trim();
   const o=document.getElementById('ok').value.trim();
   const p=document.getElementById('pk').value.trim();
+  const dlid=document.getElementById('dlid').value.trim();
+  const dlsec=document.getElementById('dlsec').value.trim();
   if(c){CK=c;localStorage.setItem('bai_c',c);}
   if(hid){HID=hid;localStorage.setItem('bai_hid',hid);}
   if(hpw){HPW=hpw;localStorage.setItem('bai_hpw',hpw);}
   if(g){GK=g;localStorage.setItem('bai_g',g);}
   if(o){OK=o;localStorage.setItem('bai_o',o);}
   if(p){PK=p;localStorage.setItem('bai_p',p);}
+  if(dlid){DLID=dlid;localStorage.setItem('bai_dlid',dlid);}
+  if(dlsec){DLSEC=dlsec;localStorage.setItem('bai_dlsec',dlsec);}
   updKey();closeModal();}
 
 function switchTab(t,btn){
@@ -709,11 +721,20 @@ ${blogContext}
     const clean=res.replace(/```json|```/g,'').trim();
     const trends=JSON.parse(clean);
 
+    // DataLab 실검색량 조회
+    const topicNames=trends.map(t=>t.topic);
+    const volumes=await getSearchVolume(topicNames);
+
     const list=document.getElementById('trendList');list.innerHTML='';
     trends.forEach(t=>{
+      const vol=volumes[t.topic];
+      const volText=vol?`<span style="font-size:10px;padding:2px 8px;border-radius:20px;background:rgba(34,211,184,0.12);color:var(--teal);border:1px solid rgba(34,211,184,0.3);">📊 ${vol}점</span>`:'';
       const div=document.createElement('div');div.className='trend-item';
-      div.innerHTML=`<div style="flex:1"><div class="trend-name">${t.topic}</div><div class="trend-reason">${t.reason}</div></div>
-        <span class="trend-badge">${t.category}</span>`;
+      div.innerHTML=`<div style="flex:1">
+        <div class="trend-name" style="display:flex;align-items:center;gap:6px;">${t.topic} ${volText}</div>
+        <div class="trend-reason">${t.reason}</div>
+      </div>
+      <span class="trend-badge">${t.category}</span>`;
       div.onclick=()=>{
         document.querySelectorAll('.trend-item').forEach(i=>i.classList.remove('sel'));
         div.classList.add('sel');
@@ -727,6 +748,23 @@ ${blogContext}
     document.getElementById('trendWrap').classList.add('show');
   }catch(e){showErr('트렌드 분석 오류: '+e.message);}
   btn.textContent='✨ 오늘의 트렌드 주제 AI 자동 추천 받기';btn.disabled=false;}
+
+// DataLab 실검색량 조회
+async function getSearchVolume(keywords){
+  if(!DLID||!DLSEC)return {};
+  try{
+    const r=await fetch(`${API}/api/datalab`,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({keywords,clientId:DLID,clientSecret:DLSEC})});
+    const d=await r.json();
+    if(!d.results)return {};
+    const vol={};
+    d.results.forEach(item=>{
+      const avg=item.data.reduce((s,v)=>s+v.ratio,0)/item.data.length;
+      vol[item.title]=Math.round(avg);
+    });
+    return vol;
+  }catch(e){console.log('DataLab 오류:',e.message);return {};}
+}
 
 // 키워드 분석
 async function analyze(){
@@ -755,15 +793,37 @@ score:50~99, imgCount:1~6`);
 
     const clean=res.replace(/\`\`\`json|\`\`\`/g,'').trim();
     const kws=JSON.parse(clean);
+
+    // DataLab 실검색량 조회
+    btn.textContent='📊 실검색량 조회 중...';
+    const kwNames=kws.map(k=>k.keyword);
+    const volumes=await getSearchVolume(kwNames);
+
     const list=document.getElementById('kwList');list.innerHTML='';
     kws.forEach(kw=>{
       const sc=kw.score;
       const sc2=sc>=90?'sh':sc>=75?'sm':'sl';
+      const vol=volumes[kw.keyword];
+      const volBadge=vol?`<span style="font-size:10px;padding:2px 9px;border-radius:20px;background:rgba(34,211,184,0.12);color:var(--teal);border:1px solid rgba(34,211,184,0.3);margin-left:6px;">📊 네이버 트렌드 ${vol}점</span>`:'';
       const div=document.createElement('div');div.className='kw-item';
-      div.innerHTML=`<div class="kw-hdr"><span class="kw-name">${kw.keyword}</span><span class="kw-sc ${sc2}">적합도 ${sc}%</span></div>
-        <div class="kw-desc">${kw.reason}</div><div class="kw-cta">선택 →</div>`;
+      div.innerHTML=`<div class="kw-hdr">
+        <span style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;">
+          <span class="kw-name">${kw.keyword}</span>
+          <span class="kw-sc ${sc2}">적합도 ${sc}%</span>
+          ${volBadge}
+        </span>
+      </div>
+      <div class="kw-desc">${kw.reason}</div>
+      <div class="kw-cta">선택 →</div>`;
       div.onclick=()=>selKeyword(div,kw);list.appendChild(div);});
     document.getElementById('kwWrap').classList.add('show');
+
+    if(!DLID||!DLSEC){
+      const note=document.createElement('p');
+      note.style.cssText='font-size:11px;color:var(--t3);margin-top:6px;';
+      note.textContent='💡 API Key 설정에서 네이버 DataLab Key를 추가하면 실제 검색량 수치가 표시돼요!';
+      document.getElementById('kwList').appendChild(note);}
+
   }catch(e){showErr('분석 오류: '+e.message);}
   btn.textContent='🔍 다시 분석';btn.disabled=false;}
 
