@@ -806,8 +806,10 @@ ${blogContext}
 async function getSearchVolume(keywords){
   if(!DLID||!DLSEC)return {};
   try{
+    // 네이버 DataLab API는 최대 5개 키워드만 허용
+    const limitedKws=keywords.slice(0,5);
     const r=await fetch(`${API}/api/datalab`,{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({keywords,clientId:DLID,clientSecret:DLSEC})});
+      body:JSON.stringify({keywords:limitedKws,clientId:DLID,clientSecret:DLSEC})});
     const d=await r.json();
     if(!d.results)return {};
     const vol={};
