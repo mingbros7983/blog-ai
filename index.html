@@ -375,6 +375,26 @@ nav{position:sticky;top:0;z-index:100;background:rgba(8,8,14,0.9);backdrop-filte
           <div class="chip" onclick="pick(this)">보통 (~1500자)</div>
           <div class="chip on" onclick="pick(this)">심층 (~3000자)</div>
           <div class="chip" onclick="pick(this)">완전 심층 (~5000자)</div>
+          <div class="chip" onclick="pick(this)">전문가급 (~8000자)</div>
+          <div class="chip" onclick="pick(this)">매거진급 (~12000자)</div>
+        </div>
+      </div>
+      <div class="field">
+        <label>타겟 고객 <span style="font-size:10px;color:var(--teal);">딥리서치 시 자동 선택</span></label>
+        <div class="chips" id="targetC">
+          <div class="chip" onclick="toggleTarget(this)">남성</div>
+          <div class="chip" onclick="toggleTarget(this)">여성</div>
+          <div class="chip" onclick="toggleTarget(this)">10대</div>
+          <div class="chip" onclick="toggleTarget(this)">20대</div>
+          <div class="chip" onclick="toggleTarget(this)">30대</div>
+          <div class="chip" onclick="toggleTarget(this)">40대</div>
+          <div class="chip" onclick="toggleTarget(this)">50대 이상</div>
+          <div class="chip" onclick="toggleTarget(this)">직장인</div>
+          <div class="chip" onclick="toggleTarget(this)">학생</div>
+          <div class="chip" onclick="toggleTarget(this)">주부</div>
+          <div class="chip" onclick="toggleTarget(this)">수험생</div>
+          <div class="chip" onclick="toggleTarget(this)">어린이</div>
+          <div class="chip" onclick="toggleTarget(this)">소아</div>
         </div>
       </div>
     </div>
@@ -646,6 +666,11 @@ function deleteBlog(id){
   renderBlogs();}
 
 function pick(el){el.closest('.chips').querySelectorAll('.chip').forEach(c=>c.classList.remove('on'));el.classList.add('on');}
+function toggleTarget(el){el.classList.toggle('on');}
+function getTargets(){return [...document.querySelectorAll('#targetC .chip.on')].map(c=>c.textContent.trim()).join('·')||'';}
+function setTargets(arr){
+  document.querySelectorAll('#targetC .chip').forEach(c=>{
+    c.classList.toggle('on',arr.includes(c.textContent.trim()));});}
 function gc(id){const e=document.querySelector(`#${id}C .chip.on`);return e?e.textContent.trim():'';}
 function getTitleStyle(){return gc('titleStyle')||'자극적·호기심유발';}function setS(n){for(let i=1;i<=7;i++){const e=document.getElementById('ps'+i);if(!e)continue;e.classList.remove('done','active');if(i<n)e.classList.add('done');if(i===n)e.classList.add('active');}}
 function setM(m){document.getElementById('progMsg').textContent=m;}
@@ -827,30 +852,47 @@ score:50~99, imgCount:1~6`);
     const kwNames=kws.map(k=>k.keyword);
     const volumes=await getSearchVolume(kwNames);
 
-    const list=document.getElementById('kwList');list.innerHTML='';
-    kws.forEach(kw=>{
-      const sc=kw.score;
-      const sc2=sc>=90?'sh':sc>=75?'sm':'sl';
-      const vol=volumes[kw.keyword];
-      const volBadge=vol?`<span style="font-size:10px;padding:2px 9px;border-radius:20px;background:rgba(34,211,184,0.12);color:var(--teal);border:1px solid rgba(34,211,184,0.3);margin-left:6px;">📊 네이버 트렌드 ${vol}점</span>`:'';
-      const div=document.createElement('div');div.className='kw-item';
-      div.innerHTML=`<div class="kw-hdr">
-        <span style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;">
-          <span class="kw-name">${kw.keyword}</span>
-          <span class="kw-sc ${sc2}">적합도 ${sc}%</span>
-          ${volBadge}
-        </span>
-      </div>
-      <div class="kw-desc">${kw.reason}</div>
-      <div class="kw-cta">선택 →</div>`;
-      div.onclick=()=>selKeyword(div,kw);list.appendChild(div);});
-    document.getElementById('kwWrap').classList.add('show');
+    // DataLab 수치 없는 키워드 필터링 (수치 있는 것만 표시)
+    const hasDataLab=!!(DLID&&DLSEC);
+    const filteredKws=hasDataLab
+      ? kws.filter(kw=>volumes[kw.keyword]!==undefined)
+      : kws;
 
-    if(!DLID||!DLSEC){
-      const note=document.createElement('p');
-      note.style.cssText='font-size:11px;color:var(--t3);margin-top:6px;';
-      note.textContent='💡 API Key 설정에서 네이버 DataLab Key를 추가하면 실제 검색량 수치가 표시돼요!';
-      document.getElementById('kwList').appendChild(note);}
+    // 타겟 자동 추천
+    const targetRes=await callC(`블로그 주제: "${topic}", 키워드: "${kwNames.join(', ')}"
+이 주제의 주요 타겟 독자를 아래 목록에서 골라줘. JSON 배열로만 답해줘.
+["남성","여성","10대","20대","30대","40대","50대 이상","직장인","학생","주부","수험생","어린이","소아"]
+중에서 해당하는 것만 선택. 예: ["20대","30대","직장인"]`);
+    try{
+      const cleanTarget=targetRes.replace(/```json|```/g,'').trim();
+      const targets=JSON.parse(cleanTarget);
+      setTargets(targets);
+    }catch{}
+
+    const list=document.getElementById('kwList');list.innerHTML='';
+
+    if(hasDataLab&&filteredKws.length===0){
+      list.innerHTML='<p style="font-size:12px;color:var(--warn);padding:12px;">📊 네이버 검색량 데이터가 있는 키워드가 없어요. 주제를 좀 더 대중적으로 바꿔보세요!</p>';
+      document.getElementById('kwWrap').classList.add('show');
+    }else{
+      (filteredKws.length>0?filteredKws:kws).forEach(kw=>{
+        const sc=kw.score;
+        const sc2=sc>=90?'sh':sc>=75?'sm':'sl';
+        const vol=volumes[kw.keyword];
+        const volBadge=vol?`<span style="font-size:10px;padding:2px 9px;border-radius:20px;background:rgba(34,211,184,0.12);color:var(--teal);border:1px solid rgba(34,211,184,0.3);margin-left:6px;">📊 네이버 트렌드 ${vol}점</span>`:'';
+        const div=document.createElement('div');div.className='kw-item';
+        div.innerHTML=`<div class="kw-hdr">
+          <span style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;">
+            <span class="kw-name">${kw.keyword}</span>
+            <span class="kw-sc ${sc2}">적합도 ${sc}%</span>
+            ${volBadge}
+          </span>
+        </div>
+        <div class="kw-desc">${kw.reason}</div>
+        <div class="kw-cta">선택 →</div>`;
+        div.onclick=()=>selKeyword(div,kw);list.appendChild(div);});
+      document.getElementById('kwWrap').classList.add('show');
+    }
 
   }catch(e){showErr('분석 오류: '+e.message);}
   btn.textContent='🔍 다시 분석';btn.disabled=false;}
@@ -872,6 +914,7 @@ async function generate(){
 
   const note=document.getElementById('note').value.trim();
   const tone=gc('tone');const len=gc('len');const imgStyle=gc('img');
+  const targets=getTargets();
   const platform=document.getElementById('platform').value;
   const mc=parseInt(document.getElementById('imgCnt').value);
   const imgCnt=isNaN(mc)||mc<1?sugCnt:mc;
@@ -954,6 +997,7 @@ async function generate(){
     const blogPrompt=`블로그 제목: "${generatedTitle}"
 주제: "${topic}", 핵심 키워드: "${kw}"
 톤앤매너: ${tone} | 글 길이: ${len}
+${targets?`타겟 독자: ${targets}`:''}
 ${note?`추가 요청: ${note}`:''}
 ${researchData?`\n최신 리서치 데이터:\n${researchData.slice(0,2000)}`:''}
 ${factCheck?`\n검증된 핵심 팩트:\n${factCheck}`:''}
