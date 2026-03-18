@@ -859,10 +859,10 @@ score:50~99, imgCount:1~6`);
     const kwNames=kws.map(k=>k.keyword);
     const volumes=await getSearchVolume(kwNames);
 
-    // DataLab 수치 없는 키워드 필터링 (수치 있는 것만 표시)
+    // DataLab 수치 없는 키워드 필터링 (30점 이상만 표시)
     const hasDataLab=!!(DLID&&DLSEC);
     const filteredKws=hasDataLab
-      ? kws.filter(kw=>volumes[kw.keyword]!==undefined)
+      ? kws.filter(kw=>volumes[kw.keyword]!==undefined && volumes[kw.keyword]>=30)
       : kws;
 
     // 타겟 자동 추천
