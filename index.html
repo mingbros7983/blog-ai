@@ -116,7 +116,21 @@ nav{position:sticky;top:0;z-index:100;background:rgba(8,8,14,0.9);backdrop-filte
 .err{display:none;padding:10px 13px;margin-bottom:10px;background:rgba(239,68,68,0.08);
   border:1px solid rgba(239,68,68,0.25);border-radius:var(--rs);font-size:12px;color:#fca5a5;}
 .err.show{display:block;}
-
+.trend-btn{width:100%;padding:13px;background:linear-gradient(135deg,rgba(34,211,184,0.08),rgba(124,110,247,0.08));
+  border:1px solid rgba(34,211,184,0.35);border-radius:var(--r);color:var(--teal);font-size:14px;font-weight:600;cursor:pointer;
+  transition:all .2s;font-family:'Noto Sans KR',sans-serif;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:8px;}
+.trend-btn:hover{background:linear-gradient(135deg,rgba(34,211,184,0.15),rgba(124,110,247,0.15));}
+.trend-btn:disabled{opacity:0.4;cursor:not-allowed;}
+.trend-wrap{display:none;margin-bottom:12px;}
+.trend-wrap.show{display:block;}
+.trend-section-title{font-size:12px;font-weight:600;color:var(--t2);margin-bottom:8px;}
+.trend-item{background:var(--bg2);border:1px solid var(--b);border-radius:var(--rs);padding:12px 16px;
+  margin-bottom:8px;cursor:pointer;transition:all .2s;display:flex;align-items:flex-start;justify-content:space-between;gap:10px;}
+.trend-item:hover{border-color:rgba(34,211,184,0.4);transform:translateX(3px);}
+.trend-item.sel{border-color:var(--teal);background:rgba(34,211,184,0.05);}
+.trend-name{font-size:13px;font-weight:700;margin-bottom:3px;}
+.trend-reason{font-size:11px;color:var(--t2);line-height:1.4;}
+.trend-badge{font-size:10px;padding:2px 8px;border-radius:20px;background:rgba(34,211,184,0.15);color:var(--teal);white-space:nowrap;flex-shrink:0;}
 .run-btn{width:100%;padding:15px;background:linear-gradient(135deg,var(--p),var(--p2));
   border:none;border-radius:var(--r);color:white;font-size:15px;font-weight:800;
   font-family:'Noto Sans KR',sans-serif;cursor:pointer;transition:all .2s;margin-bottom:12px;
@@ -337,7 +351,15 @@ nav{position:sticky;top:0;z-index:100;background:rgba(8,8,14,0.9);backdrop-filte
       </div>
     </div>
 
-    <button class="analyze-btn" id="analyzeBtn" onclick="analyze()">🔍 Perplexity 심층 리서치 + 수익 키워드 분석</button>
+    <!-- 트렌드 주제 추천 -->
+    <button class="trend-btn" id="trendBtn" onclick="getTrends()">✨ 오늘의 트렌드 주제 AI 자동 추천 받기</button>
+
+    <div class="trend-wrap" id="trendWrap">
+      <p class="trend-section-title">🔥 오늘의 추천 주제 — 클릭하면 주제 자동 입력!</p>
+      <div id="trendList"></div>
+    </div>
+
+    <button class="analyze-btn" id="analyzeBtn" onclick="analyze()">🔍 주제 심층 분석 + 수익 키워드 5개 추천</button>
 
     <div class="kw-wrap" id="kwWrap">
       <p class="kw-title">📊 추천 키워드 — 클릭하면 바로 생성 시작!</p>
@@ -560,6 +582,53 @@ async function genImg(prompt,size='1024x1024'){
   const d=await r.json();
   if(d.error)throw new Error(d.error.message||JSON.stringify(d.error));
   return d.data?.[0]?.url||null;}
+
+// 트렌드 주제 추천
+async function getTrends(){
+  if(!CK){showErr('Claude API Key를 먼저 설정해주세요');openModal();return;}
+  hideErr();
+  const btn=document.getElementById('trendBtn');
+  btn.textContent='✨ 트렌드 분석 중...';btn.disabled=true;
+
+  try{
+    let trendBase='';
+    if(PK){
+      try{
+        const pd=await callP('오늘 한국에서 가장 인기있는 블로그 주제, 검색 트렌드, 핫한 키워드 TOP 10을 알려줘. 최신 뉴스와 SNS 트렌드 기반으로.');
+        trendBase=pd.choices?.[0]?.message?.content||'';
+      }catch(e){console.log('Perplexity 오류:',e.message);}
+    }
+
+    const selBlog=blogs.find(b=>b.id===selBlogId);
+    const blogContext=selBlog?`선택된 블로그 주제 카테고리: ${selBlog.topic}`:'';
+
+    const res=await callC(`${trendBase?`오늘의 최신 트렌드 데이터:\n${trendBase.slice(0,1000)}\n\n`:''}
+${blogContext}
+
+지금 당장 블로그에 쓰면 조회수와 수익이 잘 나올 것 같은 주제 6개를 JSON 배열로만 답해줘. 마크다운 없이 순수 JSON만.
+[{"topic":"주제명","reason":"이 주제가 지금 뜨는 이유 1~2문장","category":"카테고리"}]`);
+
+    const clean=res.replace(/```json|```/g,'').trim();
+    const trends=JSON.parse(clean);
+
+    const list=document.getElementById('trendList');list.innerHTML='';
+    trends.forEach(t=>{
+      const div=document.createElement('div');div.className='trend-item';
+      div.innerHTML=`<div style="flex:1"><div class="trend-name">${t.topic}</div><div class="trend-reason">${t.reason}</div></div>
+        <span class="trend-badge">${t.category}</span>`;
+      div.onclick=()=>{
+        document.querySelectorAll('.trend-item').forEach(i=>i.classList.remove('sel'));
+        div.classList.add('sel');
+        document.getElementById('topic').value=t.topic;
+        document.getElementById('kwWrap').classList.remove('show');
+        document.getElementById('runBtn').style.display='none';
+        selKw='';
+      };
+      list.appendChild(div);});
+
+    document.getElementById('trendWrap').classList.add('show');
+  }catch(e){showErr('트렌드 분석 오류: '+e.message);}
+  btn.textContent='✨ 오늘의 트렌드 주제 AI 자동 추천 받기';btn.disabled=false;}
 
 // 키워드 분석
 async function analyze(){
