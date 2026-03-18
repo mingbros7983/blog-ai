@@ -844,7 +844,12 @@ ${analysisBase?`최신 트렌드 데이터:\n${analysisBase.slice(0,800)}`:''}
 
 수익을 낼 수 있는 블로그 키워드 5개를 JSON 배열로만 답해줘. 마크다운 없이 순수 JSON만.
 [{"keyword":"키워드명","score":96,"reason":"검색량·수익성 이유 2~3문장","imgCount":3}]
+
+중요: keyword는 반드시 2~6글자의 짧고 단순한 한국어 단어나 짧은 구문이어야 해.
+예시: "재테크", "절약법", "투자", "주식", "부동산" 처럼 짧게.
+"2026년 안전자산 포트폴리오" 같은 긴 문장형 키워드는 절대 안 됨.
 score:50~99, imgCount:1~6`);
+
 
     const clean=res.replace(/\`\`\`json|\`\`\`/g,'').trim();
     const kws=JSON.parse(clean);
