@@ -711,12 +711,17 @@ async function getTrends(){
 
     const selBlog=blogs.find(b=>b.id===selBlogId);
     const blogContext=selBlog?`선택된 블로그 주제 카테고리: ${selBlog.topic}`:'';
+    const today=new Date().toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric'});
 
-    const res=await callC(`${trendBase?`오늘의 최신 트렌드 데이터:\n${trendBase.slice(0,1000)}\n\n`:''}
+    const res=await callC(`오늘 날짜: ${today}
+${trendBase?`오늘의 최신 트렌드 데이터:\n${trendBase.slice(0,1000)}\n\n`:''}
 ${blogContext}
 
-지금 당장 블로그에 쓰면 조회수와 수익이 잘 나올 것 같은 주제 6개를 JSON 배열로만 답해줘. 마크다운 없이 순수 JSON만.
+오늘 날짜(${today}) 기준으로 지금 당장 한국에서 블로그에 쓰면 조회수와 수익이 잘 나올 것 같은 주제 6개를 JSON 배열로만 답해줘.
+반드시 2026년 현재 시점에 맞는 최신 주제여야 해. 2024~2025년 내용 절대 금지.
+마크다운 없이 순수 JSON만.
 [{"topic":"주제명","reason":"이 주제가 지금 뜨는 이유 1~2문장","category":"카테고리"}]`);
+
 
     const clean=res.replace(/```json|```/g,'').trim();
     const trends=JSON.parse(clean);
