@@ -339,6 +339,17 @@ nav{position:sticky;top:0;z-index:100;background:rgba(8,8,14,0.9);backdrop-filte
     <div class="card">
       <div class="ch"><div class="cn">02</div><div class="ct">글 스타일</div></div>
       <div class="field">
+        <label>🔥 블로그 제목 스타일</label>
+        <div class="chips" id="titleStyleC">
+          <div class="chip on" onclick="pick(this)">자극적·호기심유발</div>
+          <div class="chip" onclick="pick(this)">💰 수익·혜택 강조</div>
+          <div class="chip" onclick="pick(this)">😱 긴급·희소성</div>
+          <div class="chip" onclick="pick(this)">🤔 질문형</div>
+          <div class="chip" onclick="pick(this)">📊 숫자·리스트</div>
+          <div class="chip" onclick="pick(this)">⚡ 비교·반전</div>
+        </div>
+      </div>
+      <div class="field">
         <label>톤앤매너</label>
         <div class="chips" id="toneC">
           <div class="chip on" onclick="pick(this)">정보전달·전문적</div>
@@ -603,7 +614,7 @@ function deleteBlog(id){
 
 function pick(el){el.closest('.chips').querySelectorAll('.chip').forEach(c=>c.classList.remove('on'));el.classList.add('on');}
 function gc(id){const e=document.querySelector(`#${id}C .chip.on`);return e?e.textContent.trim():'';}
-function setS(n){for(let i=1;i<=7;i++){const e=document.getElementById('ps'+i);if(!e)continue;e.classList.remove('done','active');if(i<n)e.classList.add('done');if(i===n)e.classList.add('active');}}
+function getTitleStyle(){return gc('titleStyle')||'자극적·호기심유발';}function setS(n){for(let i=1;i<=7;i++){const e=document.getElementById('ps'+i);if(!e)continue;e.classList.remove('done','active');if(i<n)e.classList.add('done');if(i===n)e.classList.add('active');}}
 function setM(m){document.getElementById('progMsg').textContent=m;}
 function showErr(m){const e=document.getElementById('errBox');e.textContent='⚠️ '+m;e.classList.add('show');}
 function hideErr(){document.getElementById('errBox').classList.remove('show');}
@@ -823,8 +834,26 @@ async function generate(){
     // STEP 3: 타이틀
     setS(3);setM('블로그 타이틀 생성 중...');
     document.getElementById('titleCard').style.display='block';
+    const titleStyle=gc('titleStyle')||'자극적·호기심유발';
     const title=await callC(`블로그 주제: "${topic}", 핵심 키워드: "${kw}"
-클릭률 높은 SEO 최적화 블로그 제목 1개만. 제목만 답해줘.`);
+선택된 제목 스타일: ${titleStyle}
+
+아래 공식 중 "${titleStyle}"에 맞는 것을 골라서 제목 3개를 만들어줘.
+그 중 가장 클릭률이 높을 것 같은 제목 1개만 최종 선택해서 답해줘.
+
+[제목 공식들]
+🔥 자극적·호기심유발: "아무도 안 알려준 [키워드]의 충격적인 진실", "[숫자]가지 이유로 당신이 [키워드]를 잘못 알고 있는 것", "이걸 모르면 평생 손해봅니다"
+💰 수익·혜택 강조: "[숫자]만원 아끼는 [키워드] 완전정복", "나만 알고 싶었던 [키워드] 꿀팁 [숫자]가지"
+😱 긴급·희소성: "지금 당장 확인해야 할 [키워드]", "[기간] 안에 반드시 알아야 할 것들"
+🤔 질문형: "왜 [키워드]를 아무도 제대로 말해주지 않을까?", "당신도 혹시 [키워드]에 대해 이런 오해하고 있나요?"
+📊 숫자·리스트: "[숫자]가지로 정리한 [키워드] 완벽 가이드", "전문가가 선택한 TOP[숫자] [키워드]"
+⚡ 비교·대결: "[A] vs [B], 진짜 차이는 이것이었다", "해봤더니 알게 된 [키워드]의 반전"
+
+규칙:
+- 20자 내외로 임팩트 있게
+- 숫자 넣으면 클릭률 UP
+- 이모지 1~2개 포함 가능
+- 제목만 답해줘. 설명 없이.`);
     generatedTitle=title.trim();
     document.getElementById('titleTxt').textContent=generatedTitle;
 
