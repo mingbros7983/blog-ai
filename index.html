@@ -264,6 +264,12 @@ nav{position:sticky;top:0;z-index:100;background:rgba(8,8,14,0.9);backdrop-filte
     <input type="text" id="dlid" placeholder="네이버 Client ID..." />
     <label>📊 네이버 DataLab Client Secret</label>
     <input type="password" id="dlsec" placeholder="네이버 Client Secret..." />
+    <label>🚀 워드프레스 사이트 URL (자동 업로드)</label>
+    <input type="text" id="wpurl" placeholder="https://blogdominic.com" />
+    <label>🚀 워드프레스 사용자명</label>
+    <input type="text" id="wpuser" placeholder="mingbros7983@gmail.com" />
+    <label>🚀 워드프레스 비밀번호</label>
+    <input type="password" id="wppass" placeholder="워드프레스 로그인 비밀번호" />
     <div class="mbtns">
       <button class="bg" onclick="closeModal()">취소</button>
       <button class="bp" onclick="saveKeys()">저장 ✓</button>
@@ -483,6 +489,9 @@ nav{position:sticky;top:0;z-index:100;background:rgba(8,8,14,0.9);backdrop-filte
       <button class="dl-btn" id="dlPackageBtn" style="display:none;" onclick="downloadPackage()">
         📦 네이버 업로드용 HTML 패키지 다운로드
       </button>
+      <button class="dl-btn" id="wpUploadBtn" style="display:none;border-color:var(--p);color:var(--p);" onclick="uploadToWP()">
+        🚀 BlogDominic.com 에 바로 발행하기
+      </button>
 
     </div>
   </div>
@@ -506,6 +515,9 @@ let HID=localStorage.getItem('bai_hid')||'';
 let HPW=localStorage.getItem('bai_hpw')||'';
 let DLID=localStorage.getItem('bai_dlid')||'';
 let DLSEC=localStorage.getItem('bai_dlsec')||'';
+let WPURL=localStorage.getItem('bai_wpurl')||'';
+let WPUSER=localStorage.getItem('bai_wpuser')||'';
+let WPPASS=localStorage.getItem('bai_wppass')||'';
 let selKw='';let allImgs=[];let sugCnt=3;
 let researchData='';let sourcesData=[];let generatedTitle='';let generatedBody='';
 
@@ -544,6 +556,9 @@ function openModal(){
   document.getElementById('pk').value=PK;
   document.getElementById('dlid').value=DLID;
   document.getElementById('dlsec').value=DLSEC;
+  document.getElementById('wpurl').value=WPURL;
+  document.getElementById('wpuser').value=WPUSER;
+  document.getElementById('wppass').value=WPPASS;
   document.getElementById('modal').classList.add('show');}
 function closeModal(){document.getElementById('modal').classList.remove('show');}
 function saveKeys(){
@@ -555,6 +570,9 @@ function saveKeys(){
   const p=document.getElementById('pk').value.trim();
   const dlid=document.getElementById('dlid').value.trim();
   const dlsec=document.getElementById('dlsec').value.trim();
+  const wpurl=document.getElementById('wpurl').value.trim();
+  const wpuser=document.getElementById('wpuser').value.trim();
+  const wppass=document.getElementById('wppass').value.trim();
   if(c){CK=c;localStorage.setItem('bai_c',c);}
   if(hid){HID=hid;localStorage.setItem('bai_hid',hid);}
   if(hpw){HPW=hpw;localStorage.setItem('bai_hpw',hpw);}
@@ -563,6 +581,9 @@ function saveKeys(){
   if(p){PK=p;localStorage.setItem('bai_p',p);}
   if(dlid){DLID=dlid;localStorage.setItem('bai_dlid',dlid);}
   if(dlsec){DLSEC=dlsec;localStorage.setItem('bai_dlsec',dlsec);}
+  if(wpurl){WPURL=wpurl;localStorage.setItem('bai_wpurl',wpurl);}
+  if(wpuser){WPUSER=wpuser;localStorage.setItem('bai_wpuser',wpuser);}
+  if(wppass){WPPASS=wppass;localStorage.setItem('bai_wppass',wppass);}
   updKey();closeModal();}
 
 function switchTab(t,btn){
@@ -1027,6 +1048,9 @@ ${usingHiggs?'Higgsfield 최적화: cinematic lighting, dramatic composition, fi
 
     setS(7);setM('✓ 완성! 리서치 + 타이틀 + 본문 + 이미지 모두 준비됐어요 🎉');
     document.getElementById('dlPackageBtn').style.display='block';
+    if(WPURL&&WPUSER&&WPPASS){
+      document.getElementById('wpUploadBtn').style.display='block';
+    }
 
   }catch(e){showErr('생성 오류: '+e.message);setM('오류 발생');}
   document.getElementById('runBtn').disabled=false;}
@@ -1078,6 +1102,42 @@ ${imgInserts}
   const blob=new Blob([html],{type:'text/html;charset=utf-8'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);
   a.download=`${title.slice(0,30)}_네이버블로그.html`;a.click();}
+
+// 워드프레스 자동 업로드
+async function uploadToWP(){
+  if(!WPURL||!WPUSER||!WPPASS){showErr('API Key 설정에서 워드프레스 정보를 입력해주세요');openModal();return;}
+  if(!generatedTitle||!generatedBody){showErr('먼저 블로그 글을 생성해주세요');return;}
+
+  const btn=document.getElementById('wpUploadBtn');
+  btn.textContent='🚀 발행 중...';btn.disabled=true;
+
+  try{
+    const r=await fetch(`${API}/api/wordpress`,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        siteUrl:WPURL,
+        username:WPUSER,
+        password:WPPASS,
+        title:generatedTitle,
+        content:generatedBody,
+        status:'publish'
+      })});
+    const d=await r.json();
+    if(d.success){
+      btn.textContent='✅ 발행 완료!';
+      setTimeout(()=>{
+        if(confirm(`BlogDominic.com에 발행됐어요! 🎉\n\n바로 확인할까요?\n${d.url}`)){
+          window.open(d.url,'_blank');
+        }
+      },300);
+    }else{
+      throw new Error(d.error||'발행 실패');
+    }
+  }catch(e){
+    showErr('워드프레스 발행 오류: '+e.message);
+    btn.textContent='🚀 BlogDominic.com 에 바로 발행하기';
+  }
+  btn.disabled=false;
+}
 
 function cpTitle(){navigator.clipboard.writeText(document.getElementById('titleTxt').textContent).then(()=>alert('타이틀 복사됐어요!'));}
 function cpText(){
