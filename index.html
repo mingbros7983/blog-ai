@@ -1047,14 +1047,16 @@ ${factCheck?`\n검증된 핵심 팩트:\n${factCheck}`:''}
         '🎬 시네마틱 (Higgsfield)':'cinematic',
         '🎭 드라마틱 라이팅 (Higgsfield)':'dramatic',
         '🌅 영화 색감 (Higgsfield)':'film',
-        'AI 자동 선택':'cinematic',
+        'AI 자동 선택':'auto',
         '미니멀 인포그래픽':'minimal',
         '3D 아이소메트릭':'isometric',
         '포토리얼':'photorealistic',
         '수채화 일러스트':'watercolor'
       };
-      const hStyle=styleMap[imgStyle]||'cinematic';
-      const usingHiggs=!!(HID&&HPW);
+      const hStyle=styleMap[imgStyle]||'auto';
+      // AI 자동 선택이나 일반 스타일은 Higgsfield 사용 안 함
+      const isHiggsStyle=['cinematic','dramatic','film'].includes(hStyle);
+      const usingHiggs=!!(HID&&HPW&&isHiggsStyle);
 
       setS(5);setM(`썸네일 생성 중... ${usingHiggs?'(Higgsfield 시네마틱)':''}`);
       const tp=await callC(`블로그 제목: "${generatedTitle}", 주제: "${topic}"
