@@ -220,12 +220,17 @@ nav{position:sticky;top:0;z-index:100;background:rgba(8,8,14,0.9);backdrop-filte
     <p class="modal-desc">각 서비스의 API Key를 입력하세요. 브라우저에만 저장돼요.<br>
     Claude: <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a> |
     Gemini: <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com</a> |
-    Perplexity: <a href="https://perplexity.ai" target="_blank">perplexity.ai → Settings → API</a></p>
+    Perplexity: <a href="https://perplexity.ai" target="_blank">perplexity.ai → Settings → API</a> |
+    Higgsfield: <a href="https://cloud.higgsfield.ai" target="_blank">cloud.higgsfield.ai</a></p>
     <label>Claude API Key (글 생성) *필수</label>
     <input type="password" id="ck" placeholder="sk-ant-api03-..." />
-    <label>Gemini API Key (이미지 생성 — 한글 텍스트 정확도 94%) ⭐ 추천</label>
+    <label>🎨 Higgsfield API ID (시네마틱 고퀄 이미지) ⭐ 오빠 강점!</label>
+    <input type="password" id="hid" placeholder="Higgsfield API ID..." />
+    <label>🎨 Higgsfield API Password</label>
+    <input type="password" id="hpw" placeholder="Higgsfield API Password..." />
+    <label>Gemini API Key (이미지 폴백 — 한글 텍스트 최적화)</label>
     <input type="password" id="gk" placeholder="AIza..." />
-    <label>OpenAI API Key (DALL-E 폴백용 — Gemini 없을 때 사용)</label>
+    <label>OpenAI API Key (DALL-E 폴백용)</label>
     <input type="password" id="ok" placeholder="sk-proj-..." />
     <label>Perplexity API Key (웹 리서치 + 출처 검증)</label>
     <input type="password" id="pk" placeholder="pplx-..." />
@@ -334,11 +339,13 @@ nav{position:sticky;top:0;z-index:100;background:rgba(8,8,14,0.9);backdrop-filte
         <label>이미지 스타일</label>
         <div class="chips" id="imgC">
           <div class="chip on" onclick="pick(this)">AI 자동 선택</div>
+          <div class="chip" onclick="pick(this)">🎬 시네마틱 (Higgsfield)</div>
+          <div class="chip" onclick="pick(this)">🎭 드라마틱 라이팅 (Higgsfield)</div>
+          <div class="chip" onclick="pick(this)">🌅 영화 색감 (Higgsfield)</div>
           <div class="chip" onclick="pick(this)">미니멀 인포그래픽</div>
           <div class="chip" onclick="pick(this)">3D 아이소메트릭</div>
           <div class="chip" onclick="pick(this)">포토리얼</div>
           <div class="chip" onclick="pick(this)">수채화 일러스트</div>
-          <div class="chip" onclick="pick(this)">시네마틱</div>
         </div>
       </div>
       <div class="field">
@@ -454,6 +461,8 @@ let CK=localStorage.getItem('bai_c')||'';
 let OK=localStorage.getItem('bai_o')||'';
 let PK=localStorage.getItem('bai_p')||'';
 let GK=localStorage.getItem('bai_g')||'';
+let HID=localStorage.getItem('bai_hid')||'';
+let HPW=localStorage.getItem('bai_hpw')||'';
 let selKw='';let allImgs=[];let sugCnt=3;
 let researchData='';let sourcesData=[];let generatedTitle='';let generatedBody='';
 
@@ -475,14 +484,18 @@ window.onload=()=>{updKey();renderBlogs();renderBlogSelector();};
 
 function updKey(){
   const b=document.getElementById('keyBtn');
-  const hasImg=!!(GK||OK);
-  if(CK&&hasImg&&PK){b.textContent='✓ Key 전체 설정됨';b.classList.add('ok');}
+  const hasImg=!!(HID||GK||OK);
+  if(CK&&hasImg&&PK){
+    const eng=HID?'Higgsfield':GK?'Gemini':'DALL-E';
+    b.textContent=`✓ Key 설정됨 (이미지: ${eng})`;b.classList.add('ok');}
   else if(CK&&hasImg){b.textContent='⚠ Perplexity Key 미설정';b.classList.remove('ok');}
   else if(CK){b.textContent='⚠ 이미지 Key 미설정';b.classList.remove('ok');}
   else{b.textContent='🔑 Key 설정';b.classList.remove('ok');}
 }
 function openModal(){
   document.getElementById('ck').value=CK;
+  document.getElementById('hid').value=HID;
+  document.getElementById('hpw').value=HPW;
   document.getElementById('gk').value=GK;
   document.getElementById('ok').value=OK;
   document.getElementById('pk').value=PK;
@@ -490,10 +503,14 @@ function openModal(){
 function closeModal(){document.getElementById('modal').classList.remove('show');}
 function saveKeys(){
   const c=document.getElementById('ck').value.trim();
+  const hid=document.getElementById('hid').value.trim();
+  const hpw=document.getElementById('hpw').value.trim();
   const g=document.getElementById('gk').value.trim();
   const o=document.getElementById('ok').value.trim();
   const p=document.getElementById('pk').value.trim();
   if(c){CK=c;localStorage.setItem('bai_c',c);}
+  if(hid){HID=hid;localStorage.setItem('bai_hid',hid);}
+  if(hpw){HPW=hpw;localStorage.setItem('bai_hpw',hpw);}
   if(g){GK=g;localStorage.setItem('bai_g',g);}
   if(o){OK=o;localStorage.setItem('bai_o',o);}
   if(p){PK=p;localStorage.setItem('bai_p',p);}
@@ -590,24 +607,33 @@ async function callP(query){
   if(d.error)throw new Error(JSON.stringify(d.error));
   return d;}
 
-async function genImg(prompt, size='1024x1024'){
-  // Gemini 우선 사용 (한글 텍스트 품질 훨씬 좋음)
+async function genImg(prompt, size='1024x1024', style='cinematic'){
+  // 1순위: Higgsfield (오빠 강점 — 시네마틱 고퀄)
+  if(HID&&HPW){
+    try{
+      const r=await fetch(`${API}/api/higgsfield`,{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({apiId:HID,apiPass:HPW,prompt,style})});
+      const d=await r.json();
+      if(d.url)return d.url;
+      console.log('Higgsfield 실패, 다음으로:',d.error);
+    }catch(e){console.log('Higgsfield 오류:',e.message);}
+  }
+  // 2순위: Gemini (한글 텍스트 최적화)
   if(GK){
     try{
       const r=await fetch(`${API}/api/gemini`,{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({apiKey:GK,prompt,size})});
       const d=await r.json();
       if(d.imageData){
-        // base64 → blob URL 변환
         const byteStr=atob(d.imageData);
         const arr=new Uint8Array(byteStr.length);
         for(let i=0;i<byteStr.length;i++)arr[i]=byteStr.charCodeAt(i);
         const blob=new Blob([arr],{type:d.mimeType||'image/png'});
         return URL.createObjectURL(blob);
       }
-    }catch(e){console.log('Gemini 이미지 오류, DALL-E로 폴백:',e.message);}
+    }catch(e){console.log('Gemini 오류:',e.message);}
   }
-  // DALL-E 폴백
+  // 3순위: DALL-E 폴백
   if(OK){
     const r=await fetch(`${API}/api/openai`,{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({apiKey:OK,prompt,size})});
@@ -615,7 +641,7 @@ async function genImg(prompt, size='1024x1024'){
     if(d.error)throw new Error(d.error.message||JSON.stringify(d.error));
     return d.data?.[0]?.url||null;
   }
-  throw new Error('이미지 생성 API Key가 없어요 (Gemini 또는 OpenAI)');
+  throw new Error('이미지 생성 API Key가 없어요');
 }
 
 // 트렌드 주제 추천
@@ -724,7 +750,7 @@ async function generate(){
   const platform=document.getElementById('platform').value;
   const mc=parseInt(document.getElementById('imgCnt').value);
   const imgCnt=isNaN(mc)||mc<1?sugCnt:mc;
-  const hasImg=!!(GK||OK);
+  const hasImg=!!(HID||GK||OK);
 
   // 플랫폼별 썸네일 사이즈
   const thumbSize=platform==='naver'?'1024x1024':'1792x1024';
@@ -805,40 +831,61 @@ ${factCheck?`\n검증된 핵심 팩트:\n${factCheck}`:''}
 
     // STEP 5,6: 이미지
     if(hasImg){
-      setS(5);setM('썸네일 생성 중...');
+      // Higgsfield 스타일 매핑
+      const styleMap={
+        '🎬 시네마틱 (Higgsfield)':'cinematic',
+        '🎭 드라마틱 라이팅 (Higgsfield)':'dramatic',
+        '🌅 영화 색감 (Higgsfield)':'film',
+        'AI 자동 선택':'cinematic',
+        '미니멀 인포그래픽':'minimal',
+        '3D 아이소메트릭':'isometric',
+        '포토리얼':'photorealistic',
+        '수채화 일러스트':'watercolor'
+      };
+      const hStyle=styleMap[imgStyle]||'cinematic';
+      const usingHiggs=!!(HID&&HPW);
+
+      setS(5);setM(`썸네일 생성 중... ${usingHiggs?'(Higgsfield 시네마틱)':''}`);
       const tp=await callC(`블로그 제목: "${generatedTitle}", 주제: "${topic}"
 플랫폼: ${platform==='naver'?'네이버 블로그 (정사각형 1:1)':'티스토리 (가로형 16:9)'}
-이 블로그 썸네일용 DALL-E 프롬프트를 영어로 1개만.
-스타일: ${imgStyle==='AI 자동 선택'?'주제에 가장 어울리는 스타일':imgStyle}
-고품질, 눈길 끄는 비주얼. 프롬프트만.`);
+이미지 생성 AI: ${usingHiggs?'Higgsfield (시네마틱 영화 스타일)':'Gemini/DALL-E'}
+썸네일 이미지 프롬프트를 영어로 1개만 작성해줘.
+${usingHiggs?'Higgsfield 최적화: cinematic lighting, dramatic composition, film-grade color grading, professional photography style':''}
+스타일: ${imgStyle.includes('Higgsfield')?'cinematic film style, dramatic lighting':imgStyle==='AI 자동 선택'?'주제에 가장 어울리는 스타일':imgStyle}
+고품질, 눈길 끄는 비주얼. 텍스트 없이 순수 비주얼. 프롬프트만.`);
 
       const te=document.getElementById('thumbImg');
-      try{const tu=await genImg(tp.trim(),thumbSize);
+      try{const tu=await genImg(tp.trim(),thumbSize,hStyle);
         if(tu){te.innerHTML=`<img src="${tu}" alt="썸네일"/>`;allImgs.unshift({url:tu,type:'thumbnail',name:'thumbnail'});}
         else te.innerHTML=`<div class="il" style="color:#fca5a5">썸네일 실패</div>`;}
-      catch{te.innerHTML=`<div class="il" style="color:#fca5a5">썸네일 실패</div>`;}
+      catch(e){console.log(e);te.innerHTML=`<div class="il" style="color:#fca5a5">썸네일 실패</div>`;}
 
-      setS(6);setM(`본문 이미지 ${imgCnt}장 생성 중...`);
+      setS(6);setM(`본문 이미지 ${imgCnt}장 생성 중... ${usingHiggs?'(Higgsfield 고퀄)':''}`);
       document.getElementById('imgCard').style.display='block';
       document.getElementById('imgCntRes').textContent=`총 ${imgCnt}장`;
 
       const ip=await callC(`블로그: "${generatedTitle}", 주제: "${topic}"
-본문 내용과 직접 연관된 이미지 ${imgCnt}개 DALL-E 프롬프트 (영어, 줄바꿈 구분, 번호 없음).
-스타일: ${imgStyle==='AI 자동 선택'?'주제에 가장 어울리는 스타일':imgStyle}
-각 이미지가 다른 포인트를 시각화. 각 50단어 이내.`);
+본문 내용과 직접 연관된 이미지 ${imgCnt}개 프롬프트 (영어, 줄바꿈 구분, 번호 없음).
+${usingHiggs?'Higgsfield 최적화: cinematic lighting, dramatic composition, film-grade quality for each image':''}
+스타일: ${imgStyle.includes('Higgsfield')?'cinematic film style':imgStyle==='AI 자동 선택'?'주제에 가장 어울리는 스타일':imgStyle}
+각 이미지가 블로그의 서로 다른 핵심 포인트를 시각화. 텍스트 없이 순수 비주얼. 각 60단어 이내.`);
 
       const ps=ip.split('\n').filter(p=>p.trim().length>15).slice(0,imgCnt);
       const grid=document.getElementById('imgGrid');grid.innerHTML='';
       const its=[];
       for(let i=0;i<ps.length;i++){const it=document.createElement('div');it.className='ii';
-        it.innerHTML=`<div class="il"><div class="sp"></div><span>${i+1}번 생성 중</span></div>`;
+        it.innerHTML=`<div class="il"><div class="sp"></div><span>${i+1}번 ${usingHiggs?'Higgsfield':'AI'} 생성 중</span></div>`;
         grid.appendChild(it);its.push(it);}
 
       await Promise.all(ps.map(async(p,i)=>{
-        try{const u=await genImg(p.trim());
+        try{const u=await genImg(p.trim(),thumbSize,hStyle);
           if(u){allImgs.push({url:u,type:'body',name:`image_${i+1}`});its[i].innerHTML=`<img src="${u}" alt="${i+1}"/>`;}
           else its[i].innerHTML=`<div class="il" style="color:#fca5a5">실패</div>`;}
         catch{its[i].innerHTML=`<div class="il" style="color:#fca5a5">실패</div>`;}}));
+
+      // 엔진 표시 업데이트
+      const engLabel=document.getElementById('imgEngineLabel');
+      if(engLabel)engLabel.textContent=usingHiggs?'Higgsfield 시네마틱 생성':GK?'Gemini AI 생성':'DALL-E 3 생성';
     }
 
     setS(7);setM('✓ 완성! 리서치 + 타이틀 + 본문 + 이미지 모두 준비됐어요 🎉');
